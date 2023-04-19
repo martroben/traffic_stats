@@ -17,13 +17,15 @@ def get_base64_api_key(api_key_id: str, api_key: str) -> bytes:
     return api_key_base64
 
 
-def get_access_token(endpoint_url: str, base64_api_key: bytes) -> str:
+def request_access_token(api_url: str, base64_api_key: bytes) -> requests.Response:
     """
-    Get access token
-    :param endpoint_url: Full url of the API authorization endpoint
+    Perform HTTP request for access token.
+    :param api_url: API url
     :param base64_api_key: Base64 encoded combination of API key ID and API key
-    :return: Access token as string
+    :return: Request response object
     """
+    authorization_endpoint = "/auth/key-login"
+    endpoint_url = api_url.strip("/") + authorization_endpoint
     headers = {"X-API-KEY": base64_api_key}
     parameters = {}
     body = {}
@@ -34,6 +36,7 @@ def get_access_token(endpoint_url: str, base64_api_key: bytes) -> str:
         data=body,
         params=parameters)
 
-    response_json = response.json()
-    token = response_json["data"]["accessToken"]
-    return token
+    return response
+
+
+
