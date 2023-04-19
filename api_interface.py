@@ -19,7 +19,7 @@ def get_base64_api_key(api_key_id: str, api_key: str) -> bytes:
 
 def request_access_token(api_url: str, base64_api_key: bytes) -> requests.Response:
     """
-    Perform HTTP request for access token.
+    Make an HTTP request for access token.
     :param api_url: API url
     :param base64_api_key: Base64 encoded combination of API key ID and API key
     :return: Request response object
@@ -39,4 +39,21 @@ def request_access_token(api_url: str, base64_api_key: bytes) -> requests.Respon
     return response
 
 
+def request_dataset_info(api_url: str, dataset_id: str, token: str) -> requests.Response:
+    """
+    Make an HTTP request to get general info of a dataset by dataset id
+    :param api_url: API url
+    :param dataset_id: Dataset id (from dataset page in avaandmed.eesti.ee)
+    :param token: API token from authorization endpoint
+    :return: Request response object
+    """
 
+    dataset_info_endpoint = "/datasets/" + dataset_id
+    headers = {
+        "Authorization": "bearer" + token}
+
+    dataset_info_response = requests.get(
+        url=api_url.strip("/") + dataset_info_endpoint,
+        headers=headers)
+
+    return dataset_info_response
