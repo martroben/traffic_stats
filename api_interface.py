@@ -39,21 +39,75 @@ def request_access_token(api_url: str, base64_api_key: bytes) -> requests.Respon
     return response
 
 
-def request_dataset_info(api_url: str, dataset_id: str, token: str) -> requests.Response:
-    """
-    Make an HTTP request to get general info of a dataset by dataset id
-    :param api_url: API url
-    :param dataset_id: Dataset id (from dataset page in avaandmed.eesti.ee)
-    :param token: API token from authorization endpoint
-    :return: Request response object
-    """
+# def request_dataset_info(api_url: str, dataset_id: str, token: str) -> requests.Response:
+#     """
+#     Make an HTTP request to get general info of a dataset by dataset id
+#     :param api_url: API url
+#     :param dataset_id: Dataset id (from dataset page in avaandmed.eesti.ee)
+#     :param token: API token from authorization endpoint
+#     :return: Request response object
+#     """
+#
+#     dataset_info_endpoint = "/datasets/" + dataset_id
+#     headers = {
+#         "Authorization": "bearer" + token}
+#
+#     dataset_info_response = requests.get(
+#         url=api_url.strip("/") + dataset_info_endpoint,
+#         headers=headers)
+#
+#     return dataset_info_response
 
-    dataset_info_endpoint = "/datasets/" + dataset_id
-    headers = {
-        "Authorization": "bearer" + token}
 
-    dataset_info_response = requests.get(
-        url=api_url.strip("/") + dataset_info_endpoint,
-        headers=headers)
+class ApiSession(requests.Session):
+    """A session object that includes the Api authorization header."""
+    def __init__(self, token: str):
+        super().__init__()
+        headers = {"Authorization": f"bearer {token}"}
+        self.headers.update(headers)
 
-    return dataset_info_response
+
+class ApiInterface:
+    """Interface for Halo requests."""
+
+    def __init__(self, api_url: str, session: ApiSession):
+        self.api_url = api_url.strip("/")
+        self.session = session
+
+    def request(self, method: str, endpoint_url: str, params: dict = None,
+                json: (list | dict) = None) -> requests.Response:
+        """
+        Method to perform the actual API requests.
+        :param method: Request method (e.g. get, post...)
+        :param endpoint_url: Full API endpoint url
+        :param params: Request parameters (for GET requests)
+        :param json: Dict for json content (for POST requests)
+        :return: Response object or None if request fails
+        """
+        response = self.session.request(
+            method=method,
+            url=endpoint_url,
+            params=params,
+            json=json)
+
+        return response
+
+    def get_dataset_info(self, dataset_id: str) -> requests.Response:
+        """
+        Make an HTTP request to get general info of a dataset.
+        :param dataset_id: Dataset id (from dataset page in avaandmed.eesti.ee)
+        :return: Request response object
+        """
+        dataset_info_endpoint = f"{self.api_url}/datasets/{dataset_id}"
+        dataset_info_response = self.request(
+            method="GET",
+            endpoint_url=dataset_info_endpoint)
+        return dataset_info_response
+
+    def get_file(self, dataset_id: str, file_id: str) -> requests.Response:
+        file_endpoint = f"{self.api_url}/datasets/{dataset_id}/files/{file_id}/download"
+        file_response = self.request(
+            method="POST",
+            endpoint_url=file_endpoint)
+        file_response.encoding = "utf8"
+        return file_response
