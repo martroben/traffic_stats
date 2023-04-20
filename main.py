@@ -1,6 +1,6 @@
 # standard
 import os
-from io import StringIO
+import io
 # external
 import pandas as pd
 # local
@@ -75,6 +75,4 @@ for file in dataset_files_processed:
 
 # Get actual data
 file_response = api.get_file(dataset_id=dataset_id, file_id=str(largest_file["id"]))
-data = pd.read_csv(StringIO(file_response.text))
-
-
+data = pd.read_csv(io.StringIO(file_response.text))
