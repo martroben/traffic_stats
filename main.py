@@ -75,4 +75,38 @@ for file in dataset_files_processed:
 
 # Get actual data
 file_response = api.get_file(dataset_id=dataset_id, file_id=str(largest_file["id"]))
+# noinspection PyTypeChecker
+# Pycharm/Pandas type hint conflict
 data = pd.read_csv(io.StringIO(file_response.text))
+
+columns_of_interest = [
+    "Toimumisaeg",
+    "Isikuid",
+    "Hukkunuid",
+    "Vigastatuid",
+    "Sõidukeid",
+    "Kergliikurijuhi osalusel",
+    "Jalakäija osalusel",
+    "Kaassõitja osalusel",
+    "Maastikusõiduki juhi osalusel",
+    "Bussijuhi osalusel",
+    "Veoautojuhi osalusel",
+    "Ühissõidukijuhi osalusel",
+    "Sõiduautojuhi osalusel",
+    "Mootorratturi osalusel",
+    "Mopeedijuhi osalusel",
+    "Jalgratturi osalusel",
+    "Mootorsõidukijuhi osalusel",
+    "Lubatud sõidukiirus (PPA)"]
+
+
+data_cleaned = data.loc[:, columns_of_interest]
+data_cleaned.loc[:, "Toimumisaeg"] = pd.to_datetime(
+    data_cleaned["Toimumisaeg"],
+    format="mixed",
+    dayfirst=True)
+
+data_cleaned["Lubatud sõidukiirus (PPA)"].unique()
+
+data_cleaned.query("`Lubatud sõidukiirus (PPA)` == 901")
+data_cleaned.query("`Lubatud sõidukiirus (PPA)`.isna()", engine="python")
