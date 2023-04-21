@@ -77,7 +77,66 @@ for file in dataset_files_processed:
 file_response = api.get_file(dataset_id=dataset_id, file_id=str(largest_file["id"]))
 # noinspection PyTypeChecker
 # Pycharm/Pandas type hint conflict
-data = pd.read_csv(io.StringIO(file_response.text))
+data_raw = pd.read_csv(io.StringIO(file_response.text))
+
+
+###############
+# Format data #
+###############
+
+# Convert dates to datetime format
+traffic_accidents = data_raw
+traffic_accidents.loc[:, "Toimumisaeg"] = pd.to_datetime(
+    arg=traffic_accidents["Toimumisaeg"],
+    format="mixed",
+    dayfirst=True)
+
+traffic_accidents = traffic_accidents.sort_values(by="Toimumisaeg")
+
+
+#######################
+# Naive accident data #
+#######################
+
+motor_vehicle_accidents = traffic_accidents\
+    .query("`Mootorsõidukijuhi osalusel` == 1")\
+    .assign(
+        day=lambda df: df["Toimumisaeg"].map(lambda x: x.floor("d")),
+        total_harmed=lambda df: df["Hukkunuid"] + df["Vigastatuid"])\
+    .groupby("day")["total_harmed"]\
+    .sum()
+
+
+
+
+bicycle_accidents = traffic_accidents.query("`Jalgratturi osalusel` == 1")
+
+
+
+import plotly.graph_objects as go
+figure = go.Figure()
+motor_vehicle_graph = go.Bar(
+    name="people hurt in motor vehicle accidents",
+    x=motor_vehicle_accidents.keys(),
+    y=motor_vehicle_accidents.values,
+    marker={"color": "#526a83", "line_color": "#526a83"})
+
+figure.add_trace(motor_vehicle_graph)
+figure.update_layout(
+    bargap=0,
+    autosize=False,
+    width=1200,
+    height=300,
+    plot_bgcolor="white")
+
+figure.update_yaxes(gridcolor="lightgrey")
+
+figure.show()
+
+# bicycle color: #a06177 ?
+# https://plotly.com/python/discrete-color/
+
+
 
 columns_of_interest = [
     "Toimumisaeg",
@@ -99,14 +158,12 @@ columns_of_interest = [
     "Mootorsõidukijuhi osalusel",
     "Lubatud sõidukiirus (PPA)"]
 
+data = data_all.loc[:, columns_of_interest]
 
-data_cleaned = data.loc[:, columns_of_interest]
-data_cleaned.loc[:, "Toimumisaeg"] = pd.to_datetime(
-    data_cleaned["Toimumisaeg"],
-    format="mixed",
-    dayfirst=True)
 
-data_cleaned["Lubatud sõidukiirus (PPA)"].unique()
 
-data_cleaned.query("`Lubatud sõidukiirus (PPA)` == 901")
-data_cleaned.query("`Lubatud sõidukiirus (PPA)`.isna()", engine="python")
+
+
+data_all["Lubatud sõidukiirus (PPA)"].unique()
+data_all.query("`Lubatud sõidukiirus (PPA)` == 901")
+no_speed_limit = data_all.query("`Lubatud sõidukiirus (PPA)`.isna()", engine="python")
