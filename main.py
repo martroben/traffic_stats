@@ -100,25 +100,21 @@ traffic_accidents = traffic_accidents.sort_values(by="Toimumisaeg")
 # Naive accident data #
 #######################
 
-##################### Find way to end on same day
+##################### Write a general function of 2 inputs
 
-motor_vehicle_accidents = traffic_accidents\
-    .query("`Mootorsõidukijuhi osalusel` == 1")\
+traffic_accidents_by_day = traffic_accidents\
     .assign(
         day=lambda df: df["Toimumisaeg"].map(lambda x: x.floor("d")),
-        total_harmed=lambda df: df["Hukkunuid"] + df["Vigastatuid"])\
-    .groupby("day", as_index=False)[["day", "total_harmed"]]\
-    .agg({"day": "first", "total_harmed": "sum"})\
-    .assign(cumulative_harmed = lambda df: df["total_harmed"].cumsum())
-
-bicycle_accidents = traffic_accidents\
-    .query("`Jalgratturi osalusel` == 1")\
+        harmed_vehicle=lambda df: (df["Hukkunuid"] + df["Vigastatuid"]) * df["Mootorsõidukijuhi osalusel"],
+        harmed_bicycle=lambda df: (df["Hukkunuid"] + df["Vigastatuid"]) * df["Jalgratturi osalusel"])\
+    .groupby("day", as_index=False)[["day", "harmed_vehicle", "harmed_bicycle"]]\
+    .agg({
+        "day": "first",
+        "harmed_vehicle": "sum",
+        "harmed_bicycle": "sum"})\
     .assign(
-        day=lambda df: df["Toimumisaeg"].map(lambda x: x.floor("d")),
-        total_harmed=lambda df: df["Hukkunuid"] + df["Vigastatuid"])\
-    .groupby("day", as_index=False)[["day", "total_harmed"]]\
-    .agg({"day": "first", "total_harmed": "sum"})\
-    .assign(cumulative_harmed = lambda df: df["total_harmed"].cumsum())
+        harmed_vehicle_cumulative=lambda df: df["harmed_vehicle"].cumsum(),
+        harmed_bicycle_cumulative=lambda df: df["harmed_bicycle"].cumsum())
 
 figure = make_subplots(
     rows=3, cols=1, row_heights=[40, 2, 2],
@@ -127,24 +123,26 @@ figure = make_subplots(
 
 motor_vehicle_total_graph = go.Bar(
     name="people hurt in motor vehicle accidents",
-    x=motor_vehicle_accidents["day"],
-    y=motor_vehicle_accidents["total_harmed"],
+    x=traffic_accidents_by_day["day"],
+    y=traffic_accidents_by_day["harmed_vehicle"],
     marker={"color": "#526a83", "line_color": "#526a83"})
 
 bicycle_total_graph = go.Bar(
     name="people hurt in bicycle accidents",
-    x=bicycle_accidents["day"],
-    y=bicycle_accidents["total_harmed"],
+    x=traffic_accidents_by_day["day"],
+    y=traffic_accidents_by_day["harmed_bicycle"],
     marker={"color": "#a06177", "line_color": "#a06177"})
 
 motor_vehicle_cumulative_graph = go.Scatter(
-    x=motor_vehicle_accidents["day"],
-    y=motor_vehicle_accidents["cumulative_harmed"],
+    x=traffic_accidents_by_day["day"],
+    y=traffic_accidents_by_day["harmed_vehicle_cumulative"],
+    marker={"color": "#526a83", "line_color": "#526a83"},
     fill="tozeroy")
 
 bicycle_cumulative_graph = go.Scatter(
-    x=bicycle_accidents["day"],
-    y=bicycle_accidents["cumulative_harmed"],
+    x=traffic_accidents_by_day["day"],
+    y=traffic_accidents_by_day["harmed_bicycle_cumulative"],
+    marker={"color": "#a06177", "line_color": "#a06177"},
     fill="tozeroy")
 
 
