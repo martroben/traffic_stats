@@ -3,6 +3,8 @@ import os
 import io
 # external
 import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 # local
 import api_interface
 import general
@@ -80,11 +82,11 @@ file_response = api.get_file(dataset_id=dataset_id, file_id=str(largest_file["id
 data_raw = pd.read_csv(io.StringIO(file_response.text))
 
 
-###############
-# Format data #
-###############
+##############
+# Clean data #
+##############
 
-# Convert dates to datetime format
+# Convert dates to datetime
 traffic_accidents = data_raw
 traffic_accidents.loc[:, "Toimumisaeg"] = pd.to_datetime(
     arg=traffic_accidents["Toimumisaeg"],
@@ -98,43 +100,76 @@ traffic_accidents = traffic_accidents.sort_values(by="Toimumisaeg")
 # Naive accident data #
 #######################
 
+##################### Find way to end on same day
+
 motor_vehicle_accidents = traffic_accidents\
     .query("`Mootorsõidukijuhi osalusel` == 1")\
     .assign(
         day=lambda df: df["Toimumisaeg"].map(lambda x: x.floor("d")),
         total_harmed=lambda df: df["Hukkunuid"] + df["Vigastatuid"])\
-    .groupby("day")["total_harmed"]\
-    .sum()
+    .groupby("day", as_index=False)[["day", "total_harmed"]]\
+    .agg({"day": "first", "total_harmed": "sum"})\
+    .assign(cumulative_harmed = lambda df: df["total_harmed"].cumsum())
 
+bicycle_accidents = traffic_accidents\
+    .query("`Jalgratturi osalusel` == 1")\
+    .assign(
+        day=lambda df: df["Toimumisaeg"].map(lambda x: x.floor("d")),
+        total_harmed=lambda df: df["Hukkunuid"] + df["Vigastatuid"])\
+    .groupby("day", as_index=False)[["day", "total_harmed"]]\
+    .agg({"day": "first", "total_harmed": "sum"})\
+    .assign(cumulative_harmed = lambda df: df["total_harmed"].cumsum())
 
+figure = make_subplots(
+    rows=3, cols=1, row_heights=[40, 2, 2],
+    shared_xaxes=True,
+    vertical_spacing=0.05)
 
-
-bicycle_accidents = traffic_accidents.query("`Jalgratturi osalusel` == 1")
-
-
-
-import plotly.graph_objects as go
-figure = go.Figure()
-motor_vehicle_graph = go.Bar(
+motor_vehicle_total_graph = go.Bar(
     name="people hurt in motor vehicle accidents",
-    x=motor_vehicle_accidents.keys(),
-    y=motor_vehicle_accidents.values,
+    x=motor_vehicle_accidents["day"],
+    y=motor_vehicle_accidents["total_harmed"],
     marker={"color": "#526a83", "line_color": "#526a83"})
 
-figure.add_trace(motor_vehicle_graph)
+bicycle_total_graph = go.Bar(
+    name="people hurt in bicycle accidents",
+    x=bicycle_accidents["day"],
+    y=bicycle_accidents["total_harmed"],
+    marker={"color": "#a06177", "line_color": "#a06177"})
+
+motor_vehicle_cumulative_graph = go.Scatter(
+    x=motor_vehicle_accidents["day"],
+    y=motor_vehicle_accidents["cumulative_harmed"],
+    fill="tozeroy")
+
+bicycle_cumulative_graph = go.Scatter(
+    x=bicycle_accidents["day"],
+    y=bicycle_accidents["cumulative_harmed"],
+    fill="tozeroy")
+
+
+figure.add_trace(motor_vehicle_cumulative_graph, row=1, col=1)
+figure.add_trace(bicycle_cumulative_graph, row=1, col=1)
+figure.add_trace(motor_vehicle_total_graph, row=2, col=1)
+figure.add_trace(bicycle_total_graph, row=3, col=1)
 figure.update_layout(
     bargap=0,
-    autosize=False,
-    width=1200,
-    height=300,
-    plot_bgcolor="white")
+    # autosize=False,
+    # width=1000,
+    # height=500,
+    plot_bgcolor="white",
+    yaxis1_range=[0, 2e+4],
+    yaxis2_range=[0, 30],
+    yaxis3_range=[0, 30],
+    yaxis1_tickfont_size=10,
+    yaxis2_tickfont_size=8,
+    yaxis3_tickfont_size=8)
 
 figure.update_yaxes(gridcolor="lightgrey")
-
 figure.show()
 
-# bicycle color: #a06177 ?
-# https://plotly.com/python/discrete-color/
+
+
 
 
 
