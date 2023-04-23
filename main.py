@@ -2,8 +2,6 @@
 import os
 import io
 import json
-
-import pandas
 # external
 import pandas as pd
 # import plotly.graph_objects as go
