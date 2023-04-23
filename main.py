@@ -105,14 +105,46 @@ traffic_accidents.loc[:, "time"] = pd.to_datetime(
     format="mixed",
     dayfirst=True)
 
+# Set boolean values for appropriate columns
+traffic_accidents.loc[:, "within_built_up_area"] = traffic_accidents["within_built_up_area"]\
+    .transform(lambda x: x.lower() == "jah")
+traffic_accidents = traffic_accidents.astype({"within_built_up_area": bool})
+
+boolean_columns = [
+    "within_built_up_area",
+    "involves_personal_light_electric_vehicle_driver",
+    "involves_pedestrian",
+    "involves_passenger",
+    "involves_off_road_driver",
+    "involves_old_driver",
+    "involves_bus_driver",
+    "involves_truck_driver",
+    "involves_public_transport_driver",
+    "involves_passenger_car_driver",
+    "involves_motorcycle_driver",
+    "involves_moped_driver",
+    "involves_cyclist",
+    "involves_underage_person",
+    "involves_person_not_using_safety_equipment",
+    "involves_provisional_driving_license_driver",
+    "involves_motor_vehicle_driver"]
+
+traffic_accidents = traffic_accidents\
+    .apply(lambda x: map(bool, x) if x.name in boolean_columns else x)
+
+# Sort by time
 traffic_accidents = traffic_accidents.sort_values(by="time")
+
+
+#################### Check data points where all "involves" columns are True
+
 
 
 #######################
 # Naive accident data #
 #######################
 
-harm_by_day = traffic_accidents\
+naive_data_by_day = traffic_accidents\
     .assign(
         day=lambda df: df["time"].map(lambda x: x.floor("d")),
         n_harmed_motor_vehicle=lambda df: (df["n_diseased"] + df["n_injured"]) * df["involves_motor_vehicle_driver"],
@@ -133,14 +165,14 @@ harm_by_day = traffic_accidents\
 
 motor_vehicle_color = "#526a83"
 bicycle_color = "#a06177"
-daily_yaxis_max = 1.1 * max([max(harm_by_day["n_harmed_bicycle"]),
-                             max(harm_by_day["n_harmed_motor_vehicle"])])
-cumulative_yaxis_max = 1.1 * max([max(harm_by_day["n_harmed_bicycle_cumulative"]),
-                                  max(harm_by_day["n_harmed_motor_vehicle_cumulative"])])
-xaxis_min = min(harm_by_day["day"])
-xaxis_max = max(harm_by_day["day"])
-motor_vehicle_bicycle_ratio = max(harm_by_day["n_harmed_motor_vehicle_cumulative"]) /\
-                              max(harm_by_day["n_harmed_bicycle_cumulative"])
+daily_yaxis_max = 1.1 * max([max(naive_data_by_day["n_harmed_bicycle"]),
+                             max(naive_data_by_day["n_harmed_motor_vehicle"])])
+cumulative_yaxis_max = 1.1 * max([max(naive_data_by_day["n_harmed_bicycle_cumulative"]),
+                                  max(naive_data_by_day["n_harmed_motor_vehicle_cumulative"])])
+xaxis_min = min(naive_data_by_day["day"])
+xaxis_max = max(naive_data_by_day["day"])
+motor_vehicle_bicycle_ratio = max(naive_data_by_day["n_harmed_motor_vehicle_cumulative"]) /\
+                              max(naive_data_by_day["n_harmed_bicycle_cumulative"])
 
 figure = make_subplots(
     rows=3, cols=1,
@@ -150,8 +182,8 @@ figure = make_subplots(
 
 motor_vehicle_by_day_graph = go.Bar(
     name="people hurt in motor vehicle accidents per day",
-    x=harm_by_day["day"],
-    y=harm_by_day["n_harmed_motor_vehicle"],
+    x=naive_data_by_day["day"],
+    y=naive_data_by_day["n_harmed_motor_vehicle"],
     marker=dict(
         color=motor_vehicle_color,
         line_color=motor_vehicle_color),
@@ -159,8 +191,8 @@ motor_vehicle_by_day_graph = go.Bar(
 
 bicycle_by_day_graph = go.Bar(
     name="people hurt in bicycle accidents per day",
-    x=harm_by_day["day"],
-    y=harm_by_day["n_harmed_bicycle"],
+    x=naive_data_by_day["day"],
+    y=naive_data_by_day["n_harmed_bicycle"],
     marker=dict(
         color=bicycle_color,
         line_color=bicycle_color),
@@ -168,8 +200,8 @@ bicycle_by_day_graph = go.Bar(
 
 motor_vehicle_cumulative_graph = go.Scatter(
     name="deaths + injuries in <b>motor vehicle</b> accidents",
-    x=harm_by_day["day"],
-    y=harm_by_day["n_harmed_motor_vehicle_cumulative"],
+    x=naive_data_by_day["day"],
+    y=naive_data_by_day["n_harmed_motor_vehicle_cumulative"],
     line=dict(
         color=motor_vehicle_color,
         width=1),
@@ -177,33 +209,33 @@ motor_vehicle_cumulative_graph = go.Scatter(
 
 bicycle_cumulative_graph = go.Scatter(
     name="deaths + injuries in <b>bicycle</b> accidents",
-    x=harm_by_day["day"],
-    y=harm_by_day["n_harmed_bicycle_cumulative"],
+    x=naive_data_by_day["day"],
+    y=naive_data_by_day["n_harmed_bicycle_cumulative"],
     line=dict(
         color=bicycle_color,
         width=1),
     fill="tozeroy")
 
 motor_vehicle_cumulative_highest = go.Scatter(
-    x=[max(harm_by_day["day"])],
-    y=[max(harm_by_day["n_harmed_motor_vehicle_cumulative"])],
+    x=[max(naive_data_by_day["day"])],
+    y=[max(naive_data_by_day["n_harmed_motor_vehicle_cumulative"])],
     mode="markers+text",
     marker=dict(
         color=motor_vehicle_color,
         size=8),
-    text=[int(max(harm_by_day["n_harmed_motor_vehicle_cumulative"]))],
+    text=[int(max(naive_data_by_day["n_harmed_motor_vehicle_cumulative"]))],
     textposition="middle right",
     showlegend=False,
     cliponaxis=False)
 
 bicycle_cumulative_highest = go.Scatter(
-    x=[max(harm_by_day["day"])],
-    y=[max(harm_by_day["n_harmed_bicycle_cumulative"])],
+    x=[max(naive_data_by_day["day"])],
+    y=[max(naive_data_by_day["n_harmed_bicycle_cumulative"])],
     mode="markers+text",
     marker=dict(
         color=bicycle_color,
         size=8),
-    text=[int(max(harm_by_day["n_harmed_bicycle_cumulative"]))],
+    text=[int(max(naive_data_by_day["n_harmed_bicycle_cumulative"]))],
     textposition="middle right",
     showlegend=False,
     cliponaxis=False)
@@ -238,6 +270,31 @@ figure.update_layout(
 figure.update_yaxes(gridcolor="lightgrey")
 
 figure.show()
+
+
+################
+# Victims data #
+################
+
+bicycle_victims = traffic_accidents\
+    .assign(
+        day=lambda df: df["time"].map(lambda x: x.floor("d")),
+        n_harmed=lambda df: (df["n_diseased"] + df["n_injured"]))\
+    .query("involves_cyclist & not involves_motor_vehicle_driver & (n_harmed > 1 | involves_pedestrian | involves_personal_light_electric_vehicle_driver)")
+
+victims = naive_data_by_day = traffic_accidents\
+    .assign(
+        day=lambda df: df["time"].map(lambda x: x.floor("d")),
+        n_harmed_motor_vehicle=lambda df: (df["n_diseased"] + df["n_injured"]) * df["involves_motor_vehicle_driver"],
+        n_harmed_bicycle=lambda df: (df["n_diseased"] + df["n_injured"]) * df["involves_cyclist"])\
+    .groupby("day", as_index=False)[["day", "n_harmed_motor_vehicle", "n_harmed_bicycle"]]\
+    .agg({
+        "day": "first",
+        "n_harmed_motor_vehicle": "sum",
+        "n_harmed_bicycle": "sum"})\
+    .assign(
+        n_harmed_motor_vehicle_cumulative=lambda df: df["n_harmed_motor_vehicle"].cumsum(),
+        n_harmed_bicycle_cumulative=lambda df: df["n_harmed_bicycle"].cumsum())
 
 
 # People harmed by bicycle:
