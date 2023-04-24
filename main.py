@@ -120,8 +120,9 @@ traffic_accidents = traffic_accidents.loc[~required_info_missing, :]
 n_rows_with_missing_info = sum(required_info_missing)
 
 # Set boolean values for appropriate columns
-traffic_accidents.loc[:, "within_built_up_area"] = traffic_accidents["within_built_up_area"]\
-    .transform(lambda x: x.lower() == "jah")
+traffic_accidents.loc[:, "within_built_up_area"] = (
+    traffic_accidents["within_built_up_area"]
+    .transform(lambda x: x.lower() == "jah"))
 traffic_accidents = traffic_accidents.astype({"within_built_up_area": bool})
 
 boolean_columns = [
@@ -143,8 +144,9 @@ boolean_columns = [
     "involves_provisional_driving_license_driver",
     "involves_motor_vehicle_driver"]
 
-traffic_accidents = traffic_accidents\
-    .apply(lambda x: map(bool, x) if x.name in boolean_columns else x)
+traffic_accidents = (
+    traffic_accidents
+    .apply(lambda x: map(bool, x) if x.name in boolean_columns else x))
 
 # Sort by time
 traffic_accidents = traffic_accidents.sort_values(by="time")
@@ -155,22 +157,23 @@ traffic_accidents = traffic_accidents.sort_values(by="time")
 # Naive accident data #
 #######################
 
-naive_data_by_day = traffic_accidents\
+naive_data_by_day = (
+    traffic_accidents
     .assign(
         day=lambda df: df["time"].map(lambda x: x.floor("d")),
         n_harmed_motor_vehicle=lambda df: (df["n_diseased"] + df["n_injured"]) * df["involves_motor_vehicle_driver"],
-        n_harmed_bicycle=lambda df: (df["n_diseased"] + df["n_injured"]) * df["involves_cyclist"])\
-    .groupby("day", as_index=False)[["day", "n_harmed_motor_vehicle", "n_harmed_bicycle"]]\
+        n_harmed_bicycle=lambda df: (df["n_diseased"] + df["n_injured"]) * df["involves_cyclist"])
+    .groupby("day", as_index=False)[["day", "n_harmed_motor_vehicle", "n_harmed_bicycle"]]
     .agg({
         "day": "first",
         "n_harmed_motor_vehicle": "sum",
-        "n_harmed_bicycle": "sum"})\
+        "n_harmed_bicycle": "sum"})
     .assign(
         n_harmed_motor_vehicle_cumulative=lambda df: df["n_harmed_motor_vehicle"].cumsum(),
-        n_harmed_bicycle_cumulative=lambda df: df["n_harmed_bicycle"].cumsum())
+        n_harmed_bicycle_cumulative=lambda df: df["n_harmed_bicycle"].cumsum()))
 
-motor_vehicle_bicycle_total_ratio = max(naive_data_by_day["n_harmed_motor_vehicle_cumulative"]) /\
-                                    max(naive_data_by_day["n_harmed_bicycle_cumulative"])
+motor_vehicle_bicycle_total_ratio = (max(naive_data_by_day["n_harmed_motor_vehicle_cumulative"]) /
+                                     max(naive_data_by_day["n_harmed_bicycle_cumulative"]))
 
 
 #############################
@@ -214,22 +217,23 @@ victims_motor_vehicle_by_day = (
         day="first",
         n_harmed="sum")))
 
-victims_by_day = victims_motor_vehicle_by_day \
-    .rename(columns=dict(n_harmed="n_harmed_motor_vehicle")) \
+victims_by_day = (
+    victims_motor_vehicle_by_day
+    .rename(columns=dict(n_harmed="n_harmed_motor_vehicle"))
     .join(
         other=victims_bicycle_by_day
         .rename(columns=dict(n_harmed="n_harmed_bicycle"))
         .set_index("day"),
         on="day",
-        how="outer") \
-    .fillna(0) \
-    .sort_values(by="day") \
+        how="outer")
+    .fillna(0)
+    .sort_values(by="day")
     .assign(
         n_harmed_motor_vehicle_cumulative=lambda df: df["n_harmed_motor_vehicle"].cumsum(),
-        n_harmed_bicycle_cumulative=lambda df: df["n_harmed_bicycle"].cumsum())
+        n_harmed_bicycle_cumulative=lambda df: df["n_harmed_bicycle"].cumsum()))
 
-motor_vehicle_bicycle_victim_ratio = max(victims_by_day["n_harmed_motor_vehicle_cumulative"]) /\
-                                     max(victims_by_day["n_harmed_bicycle_cumulative"])
+motor_vehicle_bicycle_victim_ratio = (max(victims_by_day["n_harmed_motor_vehicle_cumulative"]) /
+                                      max(victims_by_day["n_harmed_bicycle_cumulative"]))
 
 
 ######################
