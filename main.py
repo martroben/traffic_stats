@@ -11,6 +11,7 @@ import data_operations
 import general
 import graphing
 
+
 ####################
 # Global variables #
 ####################
@@ -151,33 +152,24 @@ traffic_accidents = (
 # Sort by time
 traffic_accidents = traffic_accidents.sort_values(by="time")
 
-####################### check involves_motor_vehicle, but no motor vehicle involved
 
 #######################
 # Naive accident data #
 #######################
 
-naive_data_by_day = (
+naive_data = (
     traffic_accidents
     .assign(
-        # Round time to full days
-        day=lambda df: df["time"].map(lambda x: x.floor("d")),
         # Summarize harm statistics
         n_harmed_motor_vehicle=lambda df: (df["n_diseased"] + df["n_injured"]) * df["involves_motor_vehicle_driver"],
         n_harmed_bicycle=lambda df: (df["n_diseased"] + df["n_injured"]) * df["involves_cyclist"])
-    # Aggregate by day
-    .groupby("day", as_index=False)[["day", "n_harmed_motor_vehicle", "n_harmed_bicycle"]]
-    .agg({
-        "day": "first",
-        "n_harmed_motor_vehicle": "sum",
-        "n_harmed_bicycle": "sum"})
-    # Add cumulative values
-    .assign(
-        n_harmed_motor_vehicle_cumulative=lambda df: df["n_harmed_motor_vehicle"].cumsum(),
-        n_harmed_bicycle_cumulative=lambda df: df["n_harmed_bicycle"].cumsum()))
+    )
 
-motor_vehicle_bicycle_total_ratio = (max(naive_data_by_day["n_harmed_motor_vehicle_cumulative"]) /
-                                     max(naive_data_by_day["n_harmed_bicycle_cumulative"]))
+naive_data_by_day = data_operations.aggregate_harm_by_day(naive_data)
+naive = data_operations.add_cumulative(naive_data_by_day)
+
+motor_vehicle_bicycle_total_ratio = (max(naive["n_harmed_motor_vehicle_cumulative"]) /
+                                     max(naive["n_harmed_bicycle_cumulative"]))
 
 
 #############################
@@ -185,7 +177,7 @@ motor_vehicle_bicycle_total_ratio = (max(naive_data_by_day["n_harmed_motor_vehic
 #############################
 
 graphing.daily_results(
-    data=naive_data_by_day,
+    data=naive,
     motor_vehicle_title="total deaths + injuries in <b>motor vehicle</b> accidents",
     bicycle_title="total deaths + injuries in <b>bicycle</b> accidents")
 
@@ -194,11 +186,9 @@ graphing.daily_results(
 # Victims data #
 ################
 
-victims_bicycle_by_day = (
+victims_bicycle = (
     traffic_accidents
     .assign(
-        # Round time to full days
-        day=lambda df: df["time"].map(lambda x: x.floor("d")),
         # Summarize harm statistics
         n_harmed=lambda df: (df["n_diseased"] + df["n_injured"]))
     # Filter relevant accidents
@@ -206,17 +196,11 @@ victims_bicycle_by_day = (
            "(n_harmed > 1 | involves_personal_light_electric_vehicle_driver | involves_pedestrian)")
     # Reduce harmed persons by 1 where causing driver is likely among them to get victims
     .assign(n_harmed=lambda df: np.where(df["n_harmed"] > 1, df["n_harmed"] - 1, df["n_harmed"]))
-    # Aggregate by day
-    .groupby("day", as_index=False)[["day", "n_harmed"]]
-    .agg(dict(
-        day="first",
-        n_harmed="sum")))
+    )
 
-victims_motor_vehicle_by_day = (
+victims_motor_vehicle = (
     traffic_accidents
     .assign(
-        # Round time to full days
-        day=lambda df: df["time"].map(lambda x: x.floor("d")),
         # Summarize harm statistics
         n_harmed=lambda df: (df["n_diseased"] + df["n_injured"]))
     # Filter relevant accidents
@@ -225,31 +209,19 @@ victims_motor_vehicle_by_day = (
            "involves_passenger | involves_motorcycle_driver | involves_moped_driver | involves_cyclist)")
     # Reduce harmed persons by 1 where causing driver is likely among them to get victims
     .assign(n_harmed=lambda df: np.where(df["n_harmed"] > 1, df["n_harmed"] - 1, df["n_harmed"]))
-    # Aggregate by day
-    .groupby("day", as_index=False)[["day", "n_harmed"]]
-    .agg(dict(
-        day="first",
-        n_harmed="sum")))
+    )
 
-victims_by_day = (
-    victims_motor_vehicle_by_day
-    .rename(columns=dict(n_harmed="n_harmed_motor_vehicle"))
-    # Join data frames by day
-    .join(
-        other=victims_bicycle_by_day
-        .rename(columns=dict(n_harmed="n_harmed_bicycle"))
-        .set_index("day"),
-        on="day",
-        how="outer")
-    .fillna(0)
-    .sort_values(by="day")
-    # Add cumulative values
-    .assign(
-        n_harmed_motor_vehicle_cumulative=lambda df: df["n_harmed_motor_vehicle"].cumsum(),
-        n_harmed_bicycle_cumulative=lambda df: df["n_harmed_bicycle"].cumsum()))
+victims_bicycle_by_day = data_operations.aggregate_harm_by_day(victims_bicycle)
+victims_motor_vehicle_by_day = data_operations.aggregate_harm_by_day(victims_motor_vehicle)
 
-motor_vehicle_bicycle_victim_ratio = (max(victims_by_day["n_harmed_motor_vehicle_cumulative"]) /
-                                      max(victims_by_day["n_harmed_bicycle_cumulative"]))
+victims_joined = data_operations.join_by_day(
+    df_bicycle=victims_bicycle_by_day,
+    df_motor_vehicle=victims_motor_vehicle_by_day)
+
+victims = data_operations.add_cumulative(victims_joined)
+
+motor_vehicle_bicycle_victim_ratio = (max(victims["n_harmed_motor_vehicle_cumulative"]) /
+                                      max(victims["n_harmed_bicycle_cumulative"]))
 
 
 ######################
@@ -257,15 +229,90 @@ motor_vehicle_bicycle_victim_ratio = (max(victims_by_day["n_harmed_motor_vehicle
 ######################
 
 graphing.daily_results(
-    data=victims_by_day,
+    data=victims,
     motor_vehicle_title="victim deaths + injuries in <b>motor vehicle</b> accidents",
     bicycle_title="victim deaths + injuries in <b>bicycle</b> accidents")
 
 
+######################################################
+# Accidents where bicycle use if a valid alternative #
+######################################################
+
+# Hypothesis 1: it's always cyclist's fault
+harmed_bicycle_h1 = (
+    traffic_accidents
+    .assign(
+        # Summarize harm statistics
+        n_harmed=lambda df: (df["n_diseased"] + df["n_injured"]))
+    # Filter relevant accidents
+    .query("involves_cyclist")
+    )
+
+harmed_motor_vehicle_h1 = (
+    traffic_accidents
+    .assign(
+        # Summarize harm statistics
+        n_harmed=lambda df: (df["n_diseased"] + df["n_injured"]))
+    # Filter relevant accidents
+    .query("involves_motor_vehicle_driver & "
+           "not involves_truck_driver & "
+           "not involves_bus_driver & "
+           "not involves_cyclist &"
+           "(within_built_up_area | speed_limit <= 50)")
+    )
+
+harmed_bicycle_h1_by_day = data_operations.aggregate_harm_by_day(harmed_bicycle_h1)
+harmed_motor_vehicle_h1_by_day = data_operations.aggregate_harm_by_day(harmed_motor_vehicle_h1)
+
+harmed_h1_joined = data_operations.join_by_day(
+    df_bicycle=harmed_bicycle_h1_by_day,
+    df_motor_vehicle=harmed_motor_vehicle_h1_by_day)
+
+harmed_h1 = data_operations.add_cumulative(harmed_h1_joined)
+
+# Hypothesis 2: it's always motor vehicle driver's fault
+harmed_bicycle_h2 = (
+    traffic_accidents
+    .assign(
+        # Summarize harm statistics
+        n_harmed=lambda df: (df["n_diseased"] + df["n_injured"]))
+    # Filter relevant accidents
+    .query("involves_cyclist & "
+           "not involves_motor_vehicle_driver")
+    )
+
+harmed_motor_vehicle_h2 = (
+    traffic_accidents
+    .assign(
+        # Summarize harm statistics
+        n_harmed=lambda df: (df["n_diseased"] + df["n_injured"]))
+    # Filter relevant accidents
+    .query("involves_motor_vehicle_driver & "
+           "not involves_truck_driver & "
+           "not involves_bus_driver & "
+           "(within_built_up_area | speed_limit <= 50)")
+    )
+
+harmed_bicycle_h2_by_day = data_operations.aggregate_harm_by_day(harmed_bicycle_h2)
+harmed_motor_vehicle_h2_by_day = data_operations.aggregate_harm_by_day(harmed_motor_vehicle_h2)
+
+harmed_h2_joined = data_operations.join_by_day(
+    df_bicycle=harmed_bicycle_h2_by_day,
+    df_motor_vehicle=harmed_motor_vehicle_h2_by_day)
+
+harmed_h2 = data_operations.add_cumulative(harmed_h2_joined)
 
 
+############################################################
+# Graph accidents where bicycle use if a valid alternative #
+############################################################
 
+graphing.daily_results(
+    data=harmed_h1,
+    motor_vehicle_title="deaths + injuries in <b>motor vehicle</b> accidents",
+    bicycle_title="deaths + injuries in <b>bicycle</b> accidents")
 
-data_all["Lubatud sõidukiirus (PPA)"].unique()
-data_all.query("`Lubatud sõidukiirus (PPA)` == 901")
-no_speed_limit = data_all.query("`Lubatud sõidukiirus (PPA)`.isna()", engine="python")
+graphing.daily_results(
+    data=harmed_h2,
+    motor_vehicle_title="deaths + injuries in <b>motor vehicle</b> accidents",
+    bicycle_title="deaths + injuries in <b>bicycle</b> accidents")
