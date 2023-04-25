@@ -119,7 +119,7 @@ required_info_missing = traffic_accidents[required_info_columns].isna().any(axis
 traffic_accidents = traffic_accidents.loc[~required_info_missing, :]
 n_rows_with_missing_info = sum(required_info_missing)
 
-# Set boolean values for appropriate columns
+# Convert appropriate columns to boolean
 traffic_accidents.loc[:, "within_built_up_area"] = (
     traffic_accidents["within_built_up_area"]
     .transform(lambda x: x.lower() == "jah"))
@@ -160,14 +160,18 @@ traffic_accidents = traffic_accidents.sort_values(by="time")
 naive_data_by_day = (
     traffic_accidents
     .assign(
+        # Round time to full days
         day=lambda df: df["time"].map(lambda x: x.floor("d")),
+        # Summarize harm statistics
         n_harmed_motor_vehicle=lambda df: (df["n_diseased"] + df["n_injured"]) * df["involves_motor_vehicle_driver"],
         n_harmed_bicycle=lambda df: (df["n_diseased"] + df["n_injured"]) * df["involves_cyclist"])
+    # Aggregate by day
     .groupby("day", as_index=False)[["day", "n_harmed_motor_vehicle", "n_harmed_bicycle"]]
     .agg({
         "day": "first",
         "n_harmed_motor_vehicle": "sum",
         "n_harmed_bicycle": "sum"})
+    # Add cumulative values
     .assign(
         n_harmed_motor_vehicle_cumulative=lambda df: df["n_harmed_motor_vehicle"].cumsum(),
         n_harmed_bicycle_cumulative=lambda df: df["n_harmed_bicycle"].cumsum()))
@@ -193,11 +197,16 @@ graphing.daily_results(
 victims_bicycle_by_day = (
     traffic_accidents
     .assign(
+        # Round time to full days
         day=lambda df: df["time"].map(lambda x: x.floor("d")),
+        # Summarize harm statistics
         n_harmed=lambda df: (df["n_diseased"] + df["n_injured"]))
+    # Filter relevant accidents
     .query("(involves_cyclist & not involves_motor_vehicle_driver) & "
            "(n_harmed > 1 | involves_personal_light_electric_vehicle_driver | involves_pedestrian)")
+    # Reduce harmed persons by 1 where causing driver is likely among them to get victims
     .assign(n_harmed=lambda df: np.where(df["n_harmed"] > 1, df["n_harmed"] - 1, df["n_harmed"]))
+    # Aggregate by day
     .groupby("day", as_index=False)[["day", "n_harmed"]]
     .agg(dict(
         day="first",
@@ -206,12 +215,17 @@ victims_bicycle_by_day = (
 victims_motor_vehicle_by_day = (
     traffic_accidents
     .assign(
+        # Round time to full days
         day=lambda df: df["time"].map(lambda x: x.floor("d")),
+        # Summarize harm statistics
         n_harmed=lambda df: (df["n_diseased"] + df["n_injured"]))
+    # Filter relevant accidents
     .query("involves_motor_vehicle_driver & "
            "(n_harmed > 1 | involves_personal_light_electric_vehicle_driver | involves_pedestrian | "
            "involves_passenger | involves_motorcycle_driver | involves_moped_driver | involves_cyclist)")
+    # Reduce harmed persons by 1 where causing driver is likely among them to get victims
     .assign(n_harmed=lambda df: np.where(df["n_harmed"] > 1, df["n_harmed"] - 1, df["n_harmed"]))
+    # Aggregate by day
     .groupby("day", as_index=False)[["day", "n_harmed"]]
     .agg(dict(
         day="first",
@@ -220,6 +234,7 @@ victims_motor_vehicle_by_day = (
 victims_by_day = (
     victims_motor_vehicle_by_day
     .rename(columns=dict(n_harmed="n_harmed_motor_vehicle"))
+    # Join data frames by day
     .join(
         other=victims_bicycle_by_day
         .rename(columns=dict(n_harmed="n_harmed_bicycle"))
@@ -228,6 +243,7 @@ victims_by_day = (
         how="outer")
     .fillna(0)
     .sort_values(by="day")
+    # Add cumulative values
     .assign(
         n_harmed_motor_vehicle_cumulative=lambda df: df["n_harmed_motor_vehicle"].cumsum(),
         n_harmed_bicycle_cumulative=lambda df: df["n_harmed_bicycle"].cumsum()))
