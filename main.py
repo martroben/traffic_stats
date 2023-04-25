@@ -238,7 +238,7 @@ graphing.daily_results(
 # Accidents where bicycle use if a valid alternative #
 ######################################################
 
-# Hypothesis 1: it's always cyclist's fault
+# Hypothesis 1: it's always the cyclist's fault
 harmed_bicycle_h1 = (
     traffic_accidents
     .assign(
@@ -261,6 +261,11 @@ harmed_motor_vehicle_h1 = (
            "(within_built_up_area | speed_limit <= 50)")
     )
 
+injured_per_accident_h1_motor_vehicle = sum(harmed_motor_vehicle_h1["n_injured"]) / len(harmed_motor_vehicle_h1)
+injured_per_accident_h1_bicycle = sum(harmed_bicycle_h1["n_injured"]) / len(harmed_bicycle_h1)
+diseased_per_accident_h1_motor_vehicle = sum(harmed_motor_vehicle_h1["n_diseased"]) / len(harmed_motor_vehicle_h1)
+diseased_per_accident_h1_bicycle = sum(harmed_bicycle_h1["n_diseased"]) / len(harmed_bicycle_h1)
+
 harmed_bicycle_h1_by_day = data_operations.aggregate_harm_by_day(harmed_bicycle_h1)
 harmed_motor_vehicle_h1_by_day = data_operations.aggregate_harm_by_day(harmed_motor_vehicle_h1)
 
@@ -270,7 +275,7 @@ harmed_h1_joined = data_operations.join_by_day(
 
 harmed_h1 = data_operations.add_cumulative(harmed_h1_joined)
 
-# Hypothesis 2: it's always motor vehicle driver's fault
+# Hypothesis 2: it's always the motor vehicle driver's fault
 harmed_bicycle_h2 = (
     traffic_accidents
     .assign(
@@ -292,6 +297,11 @@ harmed_motor_vehicle_h2 = (
            "not involves_bus_driver & "
            "(within_built_up_area | speed_limit <= 50)")
     )
+
+injured_per_accident_h2_motor_vehicle = sum(harmed_motor_vehicle_h2["n_injured"]) / len(harmed_motor_vehicle_h2)
+injured_per_accident_h2_bicycle = sum(harmed_bicycle_h2["n_injured"]) / len(harmed_bicycle_h2)
+diseased_per_accident_h2_motor_vehicle = sum(harmed_motor_vehicle_h2["n_diseased"]) / len(harmed_motor_vehicle_h2)
+diseased_per_accident_h2_bicycle = sum(harmed_bicycle_h2["n_diseased"]) / len(harmed_bicycle_h2)
 
 harmed_bicycle_h2_by_day = data_operations.aggregate_harm_by_day(harmed_bicycle_h2)
 harmed_motor_vehicle_h2_by_day = data_operations.aggregate_harm_by_day(harmed_motor_vehicle_h2)
