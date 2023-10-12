@@ -51,9 +51,9 @@ api = api_interface.ApiInterface(
     session=api_session)
 
 
-######################################
-# Pull traffic accident from the API #
-######################################
+###########################################
+# Pull traffic accident data from the API #
+###########################################
 
 # Traffic accidents dataset id
 # (https://avaandmed.eesti.ee/datasets/inimkannatanutega-liiklusonnetuste-andmed)
