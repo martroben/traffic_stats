@@ -78,6 +78,13 @@ traffic_accidents = traffic_accidents.sort_values(by="time")
 required_info_missing = traffic_accidents["route_km_marker"].isna()
 traffic_accidents = traffic_accidents.loc[~required_info_missing, :]
 
+traffic_accidents["route_km_marker"] = (
+    traffic_accidents["route_km_marker"]
+    # Replace "," with "." in the "route_km_marker" column
+    .str.replace(",", ".")
+    # Convert road_km_marker values to float
+    .astype(float))
+
 route_number = 15
 street_name = "TALLINN - RAPLA - TÜRI"
 start_km = 18
@@ -85,10 +92,6 @@ end_km = 21
 
 accidents_barrier_area = (
     traffic_accidents
-    # Convert , to . in km marker values
-    .apply(lambda x: map(re.sub, [","] * len(traffic_accidents), "." * len(traffic_accidents), x) if x.name == "route_km_marker" else x)
-    # Convert km marker values to float
-    .apply(lambda x: map(float, x) if x.name == "route_km_marker" else x)
     # Filter accidents within the area
     .query(
         f"(route_number == {route_number} | street_name == '{street_name}') & "
