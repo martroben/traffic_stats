@@ -99,15 +99,16 @@ traffic_accidents_gps = traffic_accidents
 # Filter accidents in the area of interest
 accidents_within_area_gps = (
     traffic_accidents_gps
-    # Filter accidents within the area
     .query(
-        f"gps_x >= {gps_x_min} & gps_x <= {gps_x_max} & gps_y >= {gps_y_min} & gps_y <= {gps_y_max}"))
+        f"gps_x >= {gps_x_min} & gps_x <= {gps_x_max} & "
+        f"gps_y >= {gps_y_min} & gps_y <= {gps_y_max}"))
 
 # Additional filtering to remove false matched within the coordinates
 accidents_within_area_gps = (
     accidents_within_area_gps
-    .query("route_number != 11154 & "
-           "(route_number != 11153 | route_km_marker < 0.1)"))
+    .query(
+        "route_number != 11154 & "
+        "(route_number != 11153 | route_km_marker < 0.1)"))
 
 
 # Filter by route and kilometer marker
@@ -122,7 +123,6 @@ traffic_accidents_route = traffic_accidents
 # Filter accidents in the area of interest
 accidents_within_area_route = (
     traffic_accidents_route
-    # Filter accidents within the area
     .query(
         f"(route_number == {route_number} | street_name == '{street_name}') & "
         f"route_km_marker >= {start_km} & route_km_marker <= {end_km}"))
