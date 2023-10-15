@@ -11,6 +11,7 @@ import data_operations
 # Pull traffic accident data from csv #
 #######################################
 
+# File from https://avaandmed.eesti.ee/datasets/inimkannatanutega-liiklusonnetuste-andmed
 csv_path = "lo_2011_2023.csv"
 with open(csv_path) as csv_file:
     data_raw = pd.read_csv(csv_file, delimiter=";")
