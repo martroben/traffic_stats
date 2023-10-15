@@ -1,4 +1,5 @@
 # standard
+import datetime
 import json
 # external
 import pandas as pd
@@ -65,8 +66,18 @@ traffic_accidents = (
     traffic_accidents
     .apply(lambda x: map(bool, x) if x.name in boolean_columns else x))
 
-# Sort by time
-traffic_accidents = traffic_accidents.sort_values(by="time")
+# Convert appropriate columns to float
+float_columns = ["route_km_marker", "gps_x", "gps_y"]
+missing_value_placeholder = -1.0
+
+for col in float_columns:
+    missing_values = traffic_accidents[col].isna()
+    traffic_accidents.loc[missing_values, col] = missing_value_placeholder
+
+    traffic_accidents.loc[:, col] = (
+        traffic_accidents[col]
+        .str.replace(",", ".")
+        .astype(float))
 
 
 ##############################
@@ -82,17 +93,7 @@ gps_y_min = 542660
 gps_y_max = 544382
 
 required_columns_gps = ["gps_x", "gps_y"]
-
-# Drop columns with missing info
-required_info_missing_gps = traffic_accidents[required_columns_gps].isna().any(axis="columns")
-traffic_accidents_gps = traffic_accidents.loc[~required_info_missing_gps, :]
-
-# Convert required columns to float
-for col in required_columns_gps:
-    traffic_accidents_gps.loc[:, col] = (
-        traffic_accidents_gps[col]
-        .str.replace(",", ".")
-        .astype(float))
+traffic_accidents_gps = traffic_accidents
 
 # Filter accidents in the area of interest
 accidents_within_area_gps = (
@@ -100,6 +101,12 @@ accidents_within_area_gps = (
     # Filter accidents within the area
     .query(
         f"gps_x >= {gps_x_min} & gps_x <= {gps_x_max} & gps_y >= {gps_y_min} & gps_y <= {gps_y_max}"))
+
+# Additional filtering to remove false matched within the coordinates
+accidents_within_area_gps = (
+    accidents_within_area_gps
+    .query("route_number != 11154 & "
+           "(route_number != 11153 | route_km_marker < 0.1)"))
 
 
 # Filter by route and kilometer marker
@@ -109,17 +116,7 @@ start_km = 18
 end_km = 21
 
 required_columns_route = ["route_km_marker"]
-
-# Drop columns with missing info
-required_info_missing_route = traffic_accidents[required_columns_route].isna().any(axis="columns")
-traffic_accidents_route = traffic_accidents.loc[~required_info_missing_route, :]
-
-# Convert required columns to float
-for col in required_columns_route:
-    traffic_accidents_route.loc[:, col] = (
-        traffic_accidents_route[col]
-        .str.replace(",", ".")
-        .astype(float))
+traffic_accidents_route = traffic_accidents
 
 # Filter accidents in the area of interest
 accidents_within_area_route = (
@@ -132,12 +129,29 @@ accidents_within_area_route = (
 # Combine data filtered by different methods
 accidents_within_area = (
     pd.concat([accidents_within_area_gps, accidents_within_area_route])
-    .drop_duplicates(["case_number", "time"])
-    .query("route_number != 11154")
-    .query("not (route_number == 11153 & route_km_marker > 0.1)"))
+    .drop_duplicates(["case_number", "time"]))
 
 
-################################
-# Have to convert columns route_number and route_km_marker to float for both
+#####################
+# Filter final data #
+#####################
 
-print("tere")
+export_columns = [
+    "time",
+    "barrier_built",
+    "route_number",
+    "route_km_marker",
+    "n_participants",
+    "n_vehicles",
+    "n_diseased",
+    "n_injured",
+    "accident_classification_2"]
+
+# Assuming the barrier was build during summer 2019
+barrier_build_ymd = "2019/06/01"
+accidents_within_area.insert(1, "barrier_built", accidents_within_area["time"] > datetime.datetime.strptime(barrier_build_ymd, "%Y/%m/%d"))
+
+export_data = (
+    accidents_within_area
+    .loc[:, export_columns]
+    .sort_values("time"))
