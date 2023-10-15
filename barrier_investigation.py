@@ -68,25 +68,76 @@ traffic_accidents = (
 # Sort by time
 traffic_accidents = traffic_accidents.sort_values(by="time")
 
-# Drop columns with missing km marker info
-required_info_missing = traffic_accidents["route_km_marker"].isna()
-traffic_accidents = traffic_accidents.loc[~required_info_missing, :]
 
-traffic_accidents["route_km_marker"] = (
-    traffic_accidents["route_km_marker"]
-    # Replace "," with "." in the "route_km_marker" column
-    .str.replace(",", ".")
-    # Convert road_km_marker values to float
-    .astype(float))
+##############################
+# Filter by area of interest #
+##############################
 
+# Use filtering by GPS coordinates and also by route name and kilometer marker
+
+# Filter by gps coordinates
+gps_x_min = 6565550
+gps_x_max = 6567850
+gps_y_min = 542660
+gps_y_max = 544382
+
+required_columns_gps = ["gps_x", "gps_y"]
+
+# Drop columns with missing info
+required_info_missing_gps = traffic_accidents[required_columns_gps].isna().any(axis="columns")
+traffic_accidents_gps = traffic_accidents.loc[~required_info_missing_gps, :]
+
+# Convert required columns to float
+for col in required_columns_gps:
+    traffic_accidents_gps.loc[:, col] = (
+        traffic_accidents_gps[col]
+        .str.replace(",", ".")
+        .astype(float))
+
+# Filter accidents in the area of interest
+accidents_within_area_gps = (
+    traffic_accidents_gps
+    # Filter accidents within the area
+    .query(
+        f"gps_x >= {gps_x_min} & gps_x <= {gps_x_max} & gps_y >= {gps_y_min} & gps_y <= {gps_y_max}"))
+
+
+# Filter by route and kilometer marker
 route_number = 15
 street_name = "TALLINN - RAPLA - TÜRI"
 start_km = 18
 end_km = 21
 
-accidents_barrier_area = (
-    traffic_accidents
+required_columns_route = ["route_km_marker"]
+
+# Drop columns with missing info
+required_info_missing_route = traffic_accidents[required_columns_route].isna().any(axis="columns")
+traffic_accidents_route = traffic_accidents.loc[~required_info_missing_route, :]
+
+# Convert required columns to float
+for col in required_columns_route:
+    traffic_accidents_route.loc[:, col] = (
+        traffic_accidents_route[col]
+        .str.replace(",", ".")
+        .astype(float))
+
+# Filter accidents in the area of interest
+accidents_within_area_route = (
+    traffic_accidents_route
     # Filter accidents within the area
     .query(
         f"(route_number == {route_number} | street_name == '{street_name}') & "
         f"route_km_marker >= {start_km} & route_km_marker <= {end_km}"))
+
+# Combine data filtered by different methods
+accidents_within_area = (
+    pd.concat([accidents_within_area_gps, accidents_within_area_route])
+    .drop_duplicates(["case_number", "time"])
+    .query("route_number != 11154")
+    .query("not (route_number == 11153 & route_km_marker > 0.1)"))
+
+
+################################
+# Have to convert columns route_number and route_km_marker to float for both
+
+print("tere")
